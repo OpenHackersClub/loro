@@ -25,6 +25,13 @@ wasm-bindgen-derive = "0.2.1"
 serde = { workspace = true }
 rle = { path = "../rle", package = "loro-rle" }
 tracing-wasm = { version = "0.2.1", optional = true }
+# `release_max_level_off` compile-time-elides every `tracing` macro in
+# release builds. loro-internal uses `tracing` heavily (info_span!,
+# instrument, warn); this strips that callsite machinery from the wasm.
+# Scoped to loro-wasm so crates.io consumers of loro/loro-internal keep
+# full tracing — cargo feature unification propagates it down only for
+# the wasm build.
+tracing = { version = "0.1", features = ["release_max_level_off"] }
 parking_lot = "0.12.5"
 
 [features]
