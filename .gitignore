@@ -16,3 +16,6 @@ trace-*.json
 loom_test.json
 .env
 sponsorkit/.cache.json
+wasm-size-report.json
+wasm-size-report.md
+.tmp/
