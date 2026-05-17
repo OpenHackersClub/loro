@@ -13,7 +13,9 @@
 
 import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
 import { gzip } from "https://deno.land/x/compress@v0.4.5/mod.ts";
-import brotliPromise from "npm:brotli-wasm";
+// Pinned: brotli output must be reproducible so `wasm-size-baseline.json`
+// stays comparable across runs (this script is run with `--no-lock`).
+import brotliPromise from "npm:brotli-wasm@3.0.1";
 
 const TARGETS = ["bundler", "browser", "nodejs", "web"] as const;
 type Target = (typeof TARGETS)[number];
@@ -40,6 +42,13 @@ const baselinePath = path.resolve(repoRoot, "wasm-size-baseline.json");
 const args = parseArgs(Deno.args);
 
 async function main(): Promise<void> {
+  // Resolve the baseline first so an explicit `--compare` with a bad
+  // path fails before any measurement work or file writes.
+  const baseline = await loadBaseline(
+    args.compareWith ?? baselinePath,
+    args.compareWith !== null,
+  );
+
   const brotli = await brotliPromise;
   const report: Report = {
     generatedAt: new Date().toISOString(),
@@ -69,7 +78,6 @@ async function main(): Promise<void> {
   await Deno.writeTextFile(reportJsonPath, JSON.stringify(report, null, 2) + "\n");
   console.log(`📝  Wrote ${path.relative(repoRoot, reportJsonPath)}`);
 
-  const baseline = await loadBaseline(args.compareWith ?? baselinePath);
   const md = renderMarkdown(report, baseline);
   await Deno.writeTextFile(reportMdPath, md);
   console.log(`📝  Wrote ${path.relative(repoRoot, reportMdPath)}`);
@@ -86,9 +94,17 @@ function parseArgs(input: string[]) {
   let compareWith: string | null = null;
   for (let i = 0; i < input.length; i++) {
     const a = input[i];
-    if (a === "--update-baseline") updateBaseline = true;
-    else if (a === "--compare") compareWith = input[++i];
-    else throw new Error(`Unknown argument: ${a}`);
+    if (a === "--update-baseline") {
+      updateBaseline = true;
+    } else if (a === "--compare") {
+      const value = input[++i];
+      if (value === undefined) {
+        throw new Error("--compare requires a baseline file path");
+      }
+      compareWith = value;
+    } else {
+      throw new Error(`Unknown argument: ${a}`);
+    }
   }
   return { updateBaseline, compareWith };
 }
@@ -99,24 +115,52 @@ function emptyTargets(): Record<Target, TargetMetrics | null> {
 
 async function currentCommit(): Promise<string | null> {
   try {
-    const out = await new Deno.Command("git", {
+    const rev = await new Deno.Command("git", {
       args: ["rev-parse", "--short", "HEAD"],
       cwd: repoRoot,
       stdout: "piped",
       stderr: "null",
     }).output();
-    if (out.code !== 0) return null;
-    return new TextDecoder().decode(out.stdout).trim();
+    if (rev.code !== 0) return null;
+    const sha = new TextDecoder().decode(rev.stdout).trim();
+
+    // A dirty working tree means the measured artifact does not
+    // correspond to `sha` — mark it so the report isn't misleading.
+    const status = await new Deno.Command("git", {
+      args: ["status", "--porcelain"],
+      cwd: repoRoot,
+      stdout: "piped",
+      stderr: "null",
+    }).output();
+    const dirty = status.code === 0 &&
+      new TextDecoder().decode(status.stdout).trim().length > 0;
+    return dirty ? `${sha}-dirty` : sha;
   } catch {
     return null;
   }
 }
 
-async function loadBaseline(p: string): Promise<Report | null> {
+// `required` is true when the path came from an explicit `--compare`:
+// a missing or malformed file is then a user error and must not be
+// silently skipped. The default baseline remains optional.
+async function loadBaseline(p: string, required: boolean): Promise<Report | null> {
+  let txt: string;
   try {
-    const txt = await Deno.readTextFile(p);
+    txt = await Deno.readTextFile(p);
+  } catch {
+    if (required) {
+      console.error(`❌  --compare baseline not found or unreadable: ${p}`);
+      Deno.exit(1);
+    }
+    return null;
+  }
+  try {
     return JSON.parse(txt) as Report;
   } catch {
+    if (required) {
+      console.error(`❌  --compare baseline is not valid JSON: ${p}`);
+      Deno.exit(1);
+    }
     return null;
   }
 }
