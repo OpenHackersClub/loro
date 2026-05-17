@@ -87,9 +87,25 @@ pub fn decodeFrontiers(bytes: &[u8]) -> JsResult<JsIDs> {
 }
 
 /// Enable debug info of Loro
+///
+/// Only available when `loro-wasm` is built with the `debug` feature.
+/// The default published `loro-crdt` build throws — rebuild with the
+/// `debug` feature to install the console tracing subscriber.
 #[wasm_bindgen(js_name = setDebug)]
-pub fn set_debug() {
-    tracing_wasm::set_as_global_default();
+pub fn set_debug() -> JsResult<()> {
+    #[cfg(feature = "debug")]
+    {
+        tracing_wasm::set_as_global_default();
+        Ok(())
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        Err(JsError::new(
+            "debug logging is not compiled into this build of loro-crdt; \
+             rebuild loro-wasm with the `debug` feature to enable setDebug()",
+        )
+        .into())
+    }
 }
 
 type JsResult<T> = Result<T, JsValue>;
