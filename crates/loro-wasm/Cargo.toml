@@ -16,7 +16,6 @@ js-sys = "0.3.60"
 loro-internal = { path = "../loro-internal", features = [
     "wasm",
     "counter",
-    "jsonpath",
 ] }
 loro-common = { path = "../loro-common" }
 loro-delta = { path = "../delta" }
@@ -29,7 +28,12 @@ tracing-wasm = { version = "0.2.1", optional = true }
 parking_lot = "0.12.5"
 
 [features]
-default = []
+# `jsonpath` is on by default so the published `loro-crdt` build is
+# unchanged. Building with `--no-default-features` drops the `pest`
+# parser + JSONPath grammar (~65 KB gzip). A future `loro-crdt-jsonpath`
+# companion package will ship the full build for users who need it.
+default = ["jsonpath"]
+jsonpath = ["loro-internal/jsonpath"]
 # Compiles `setDebug()` and links `tracing-wasm` (plus its
 # `tracing-subscriber` / `sharded-slab` graph). Off by default so the
 # published `loro-crdt` artifact does not carry the console subscriber.
