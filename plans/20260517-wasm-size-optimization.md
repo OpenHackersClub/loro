@@ -57,8 +57,7 @@ reports its own size delta in the PR description by re-running
 | #  | Branch                                    | Change                                                                | Impact          |
 | -- | ----------------------------------------- | --------------------------------------------------------------------- | --------------- |
 | 1  | `feat/wasm-size-benchmark`                | Add `wasm-size-bench.ts` + this plan + pinned baseline                | none (tooling)  |
-| 2  | `chore/dev-only-pretty-assertions`        | Move `pretty_assertions` from `[dependencies]` to dev-only            | dep hygiene     |
-| 3  | `perf/inline-panic-hook`                  | Replace `console_error_panic_hook` with inline `std::panic::set_hook` | ~0.3 KB gzip    |
+| 2  | `perf/inline-panic-hook`                  | Replace `console_error_panic_hook` with inline `std::panic::set_hook` | ~0.3 KB gzip    |
 
 ### Phase 1 — Benchmark + Plan
 
@@ -72,28 +71,7 @@ Exit criteria:
 - A pinned baseline file (`wasm-size-baseline.json`) is committed.
 - Plan doc is committed.
 
-### Phase 2 — Move `pretty_assertions` to dev-deps
-
-`crates/loro-internal/Cargo.toml` had `pretty_assertions = "1.4.1"` in
-`[dependencies]`. The only `src/` reference is in
-`crates/loro-internal/src/state.rs` inside `check_is_the_same`, which is
-documented as test-only and is reached from the public
-`check_state_correctness_slow` API on `LoroDoc`. That public API is **not**
-exposed through `loro-wasm`, so LTO already eliminates the pretty diff
-renderer from the published wasm — the wire delta is noise. The phase is a
-dep-classification fix, not a measurable size win.
-
-Approach:
-
-1. Move `pretty_assertions` from `[dependencies]` to `[dev-dependencies]`.
-2. In `state.rs`, swap the call site to `std::assert_eq!`. Mismatching
-   values are still surfaced; only the colorful ASCII diff goes away.
-3. Verify test files that `use pretty_assertions::assert_eq;` keep
-   compiling — they pull from dev-deps now, which is the correct scope.
-
-Risk: low.
-
-### Phase 3 — Replace `console_error_panic_hook` with an inline hook
+### Phase 2 — Replace `console_error_panic_hook` with an inline hook
 
 `loro-wasm` pulls `console_error_panic_hook` for one call:
 `console_error_panic_hook::set_once()` in the `#[wasm_bindgen(start)]`
