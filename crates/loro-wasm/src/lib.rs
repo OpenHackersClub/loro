@@ -1310,6 +1310,10 @@ impl LoroDoc {
     }
 
     /// Evaluate JSONPath against a LoroDoc
+    ///
+    /// Only available when `loro-wasm` is built with the `jsonpath`
+    /// feature (on by default).
+    #[cfg(feature = "jsonpath")]
     #[wasm_bindgen(js_name = "JSONPath")]
     pub fn json_path(&self, jsonpath: &str) -> JsResult<Array> {
         let ans = Array::new();
@@ -1332,6 +1336,10 @@ impl LoroDoc {
     /// The callback receives no query result; it is a lightweight notifier and may
     /// fire false positives so callers can debounce/throttle before running JSONPath
     /// themselves.
+    ///
+    /// Only available when `loro-wasm` is built with the `jsonpath`
+    /// feature (on by default).
+    #[cfg(feature = "jsonpath")]
     #[wasm_bindgen(js_name = "subscribeJsonpath", skip_typescript)]
     pub fn subscribe_jsonpath(&self, jsonpath: &str, f: js_sys::Function) -> JsResult<JsValue> {
         let observer = observer::Observer::new(f);
@@ -6548,12 +6556,6 @@ interface Listener {
 
 interface LoroDoc {
     subscribe(listener: Listener): Subscription;
-    /**
-     * Subscribe to changes that may affect a JSONPath query.
-     * Callback may fire false positives and carries no query result.
-     * You can debounce/throttle the callback before running `JSONPath(...)` to optimize heavy reads.
-     */
-    subscribeJsonpath(path: string, callback: () => void): Subscription;
 }
 
 interface UndoManager {
@@ -6605,12 +6607,6 @@ interface UndoManager {
     clearUndo(): void;
 }
 interface LoroDoc<T extends Record<string, Container> = Record<string, Container>> {
-    /**
-     * Subscribe to changes that may affect a JSONPath query.
-     * Callback may fire false positives and carries no query result.
-     * You can debounce/throttle the callback before running `JSONPath(...)` to optimize heavy reads.
-     */
-    subscribeJsonpath(path: string, callback: () => void): Subscription;
     /**
      * Get a LoroMap by container id
      *
@@ -7130,4 +7126,30 @@ interface EphemeralStoreEvent {
     removed: string[];
 }
 
+"#;
+
+/// TypeScript for the `jsonpath`-gated surface. `JSONPath()` generates its
+/// own typings from `#[wasm_bindgen]`; `subscribeJsonpath` is
+/// `skip_typescript`, so its declaration lives here and is only emitted
+/// when the `jsonpath` feature is enabled.
+#[cfg(feature = "jsonpath")]
+#[wasm_bindgen(typescript_custom_section)]
+const JSONPATH_TYPES: &'static str = r#"
+interface LoroDoc {
+    /**
+     * Subscribe to changes that may affect a JSONPath query.
+     * Callback may fire false positives and carries no query result.
+     * You can debounce/throttle the callback before running `JSONPath(...)` to optimize heavy reads.
+     */
+    subscribeJsonpath(path: string, callback: () => void): Subscription;
+}
+
+interface LoroDoc<T extends Record<string, Container> = Record<string, Container>> {
+    /**
+     * Subscribe to changes that may affect a JSONPath query.
+     * Callback may fire false positives and carries no query result.
+     * You can debounce/throttle the callback before running `JSONPath(...)` to optimize heavy reads.
+     */
+    subscribeJsonpath(path: string, callback: () => void): Subscription;
+}
 "#;
