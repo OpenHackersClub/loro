@@ -78,9 +78,6 @@ async function build() {
   if (profile !== "dev") {
     await Promise.all(
       TARGETS.map(async (target) => {
-        // wasm-opt is intentionally disabled: it shrinks raw bytes by ~10%
-        // but regresses gzip/brotli by ~7–10% on this bundle. See
-        // plans/20260517-wasm-size-optimization.md for the benchmark.
         // --snip-rust-panicking-code --snip-rust-fmt-code
         // const snip = `wasm-snip ./${target}/loro_wasm_bg.wasm -o ./${target}/loro_wasm_bg.wasm`;
         // console.log(">", snip);
