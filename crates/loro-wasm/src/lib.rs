@@ -63,7 +63,13 @@ pub fn LORO_VERSION() -> String {
 
 #[wasm_bindgen(start)]
 fn run() {
-    console_error_panic_hook::set_once();
+    use std::sync::Once;
+    static SET_HOOK: Once = Once::new();
+    SET_HOOK.call_once(|| {
+        std::panic::set_hook(Box::new(|info| {
+            crate::log::error(&info.to_string());
+        }));
+    });
 }
 
 #[wasm_bindgen]
