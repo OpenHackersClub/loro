@@ -46,6 +46,14 @@ const EMBED_SCRIPT = path.resolve(
 );
 const textDecoder = new TextDecoder();
 
+// When LORO_WASM_JSONPATH=1, build the `loro-crdt/jsonpath` subpath
+// artifact: cargo `--features jsonpath` and output under `jsonpath/`.
+// Otherwise build the lean default `loro-crdt` package as before.
+const jsonpathVariant = Deno.env.get("LORO_WASM_JSONPATH") === "1";
+const outBaseDir = jsonpathVariant
+  ? path.resolve(LoroWasmDir, "jsonpath")
+  : LoroWasmDir;
+
 // Check if running in CI
 const isCI = Deno.env.get("CI") === "true";
 const githubToken = Deno.env.get("GITHUB_TOKEN");
@@ -66,13 +74,13 @@ async function build() {
     }
 
     await buildTarget(target);
-    await embedSourcemap(target);
+    if (!jsonpathVariant) await embedSourcemap(target);
     return;
   }
 
   for (const t of TARGETS) {
     await buildTarget(t);
-    await embedSourcemap(t);
+    if (!jsonpathVariant) await embedSourcemap(t);
   }
 
   if (profile !== "dev") {
@@ -99,10 +107,14 @@ async function build() {
 
   if (profile === "release") {
     const wasm = await Deno.readFile(
-      path.resolve(LoroWasmDir, "bundler", "loro_wasm_bg.wasm"),
+      path.resolve(outBaseDir, "bundler", "loro_wasm_bg.wasm"),
     );
     const wasmSize = (wasm.length / 1024).toFixed(2);
-    console.log("Wasm size: ", wasmSize, "KB");
+    console.log(
+      jsonpathVariant ? "Wasm size [jsonpath]: " : "Wasm size: ",
+      wasmSize,
+      "KB",
+    );
 
     const gzipped = await gzip(wasm);
     const gzipSize = (gzipped.length / 1024).toFixed(2);
@@ -114,8 +126,8 @@ async function build() {
     const brotliSize = (brotliCompressed.length / 1024).toFixed(2);
     console.log("Brotli size: ", brotliSize, "KB");
 
-    // Report sizes to PR if in CI
-    if (isCI && githubToken && githubEventPath) {
+    // Report sizes to PR if in CI (lean build only — one comment per PR)
+    if (isCI && githubToken && githubEventPath && !jsonpathVariant) {
       console.log("Creating comment for PR");
       try {
         // Parse GitHub event data
@@ -183,6 +195,9 @@ async function cargoBuild() {
     "--profile",
     profile,
   ];
+  if (jsonpathVariant) {
+    cmd.push("--features", "jsonpath");
+  }
   console.log(cmd.join(" "));
   const env: Record<string, string> | undefined = profile === "release"
     ? (() => {
@@ -216,7 +231,7 @@ async function cargoBuild() {
 
 async function buildTarget(target: string) {
   console.log("🏗️  Building target", `[${target}]`);
-  const targetDirPath = path.resolve(LoroWasmDir, target);
+  const targetDirPath = path.resolve(outBaseDir, target);
   try {
     await Deno.remove(targetDirPath, { recursive: true });
     console.log("Clear directory " + targetDirPath);
@@ -226,8 +241,10 @@ async function buildTarget(target: string) {
 
   // TODO: polyfill FinalizationRegistry
   const bindgenTarget = target === "browser" ? "bundler" : target;
+  // --out-dir is resolved relative to the cargo/loro-wasm cwd below.
+  const outDir = path.relative(LoroWasmDir, targetDirPath);
   const cmd =
-    `wasm-bindgen --keep-debug --weak-refs --target ${bindgenTarget} --out-dir ${target} ${RawWasmPath}`;
+    `wasm-bindgen --keep-debug --weak-refs --target ${bindgenTarget} --out-dir ${outDir} ${RawWasmPath}`;
   console.log(">", cmd);
   await Deno.run({ cmd: cmd.split(" "), cwd: LoroWasmDir }).status();
   console.log();
@@ -297,13 +314,17 @@ async function postProcessWasm(targetDirPath: string, target: string) {
     return;
   }
 
-  const sourcemapPath = path.resolve(targetDirPath, "loro_wasm_bg.wasm.map");
-  await runWasmTools([
-    "sourcemap",
-    wasmPath,
-    sourcemapPath,
-    resolveSourcemapReference(target),
-  ]);
+  // The jsonpath subpath artifact ships without source maps — they have
+  // no companion host package and would bloat the main npm tarball.
+  if (!jsonpathVariant) {
+    const sourcemapPath = path.resolve(targetDirPath, "loro_wasm_bg.wasm.map");
+    await runWasmTools([
+      "sourcemap",
+      wasmPath,
+      sourcemapPath,
+      resolveSourcemapReference(target),
+    ]);
+  }
 
   if (profile === "release") {
     await runWasmTools([

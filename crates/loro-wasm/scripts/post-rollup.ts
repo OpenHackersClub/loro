@@ -1,6 +1,12 @@
 import { walk } from "https://deno.land/std@0.224.0/fs/mod.ts";
 
-const DIRS_TO_SCAN = ["./nodejs", "./bundler", "./browser", "./web"];
+// When LORO_WASM_JSONPATH=1, post-process the `loro-crdt/jsonpath`
+// subpath artifact emitted under `jsonpath/` instead of the lean default.
+const jsonpathVariant = Deno.env.get("LORO_WASM_JSONPATH") === "1";
+const dirPrefix = jsonpathVariant ? "./jsonpath/" : "./";
+const DIRS_TO_SCAN = ["nodejs", "bundler", "browser", "web"].map(
+    (d) => dirPrefix + d,
+);
 const FILES_TO_PROCESS = ["index.js", "index.d.ts"];
 
 async function replaceInFile(filePath: string) {
@@ -180,8 +186,11 @@ async function main() {
         await transform(dir);
     }
 
-    await rollupBase64();
-    await transform("./base64");
+    // The jsonpath subpath artifact does not ship the base64 variant.
+    if (!jsonpathVariant) {
+        await rollupBase64();
+        await transform("./base64");
+    }
 }
 
 if (import.meta.main) {

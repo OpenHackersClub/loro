@@ -26,17 +26,21 @@ const createConfig = (format, tsTarget, outputDir) => ({
   external: [/loro_wasm/]
 });
 
+// When LORO_WASM_JSONPATH=1 the `loro-crdt/jsonpath` subpath artifact is
+// emitted under `jsonpath/`; otherwise the lean default package targets.
+const outPrefix = process.env.LORO_WASM_JSONPATH === '1' ? 'jsonpath/' : '';
+
 // Create different bundle configurations
 export default [
   // CommonJS for Node.js
-  createConfig('cjs', 'ES2020', 'nodejs'),
+  createConfig('cjs', 'ES2020', outPrefix + 'nodejs'),
 
   // ESM for Web
-  createConfig('es', 'ES2020', 'web'),
+  createConfig('es', 'ES2020', outPrefix + 'web'),
 
   // ESM for browser bundlers that do not support top-level await.
-  createConfig('es', 'ES2020', 'browser'),
+  createConfig('es', 'ES2020', outPrefix + 'browser'),
 
   // ESM for bundler
-  createConfig('es', 'ES2020', 'bundler'),
+  createConfig('es', 'ES2020', outPrefix + 'bundler'),
 ];

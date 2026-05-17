@@ -1,4 +1,6 @@
-import { LoroDoc, LoroMap } from "../bundler/index";
+// jsonpath is opt-in: the lean default package drops it, so this suite
+// exercises the `loro-crdt/jsonpath` subpath artifact built under `jsonpath/`.
+import { LoroDoc, LoroMap } from "../jsonpath/bundler/index";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("JSONPath", () => {

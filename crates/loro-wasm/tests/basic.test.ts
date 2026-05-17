@@ -839,20 +839,6 @@ it("get path to container", () => {
   expect(path).toStrictEqual(["map", "list", 0]);
 });
 
-it("json path", () => {
-  const doc = new LoroDoc();
-  const map = doc.getMap("map");
-  map.set("key", "value");
-  const books = map.setContainer("books", new LoroList());
-  const book = books.insertContainer(0, new LoroMap());
-  book.set("title", "1984");
-  book.set("author", "George Orwell");
-  const path = "$['map'].books[0].title";
-  const result = doc.JSONPath(path);
-  expect(result.length).toBe(1);
-  expect(result).toStrictEqual(["1984"]);
-});
-
 it("can push string to text", () => {
   const doc = new LoroDoc();
   const text = doc.getText("text");
