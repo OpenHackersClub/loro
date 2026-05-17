@@ -65,9 +65,16 @@ the change applied, not from an estimate.
 | 2  | `perf/inline-panic-hook`                  | Replace `console_error_panic_hook` with inline `std::panic::set_hook` | −0.3 KB / −0.03% | −0.6 KB / −0.08% |
 | 3  | `perf/tracing-release-max-level-off`      | Add `release_max_level_off` to the `tracing` dep in `loro-wasm`       | −14 KB / −1.47% | −10 KB / −1.55% |
 | 4  | `perf/optional-tracing-wasm`              | Gate `tracing-wasm` (and `setDebug`) behind a default-off `debug` feature | −12 KB / −1.15% | −9 KB / −1.18% |
-| 5  | `perf/jsonpath-companion-package`         | Move `jsonpath` to an opt-in `loro-crdt-jsonpath` companion npm package | −65 KB / −6.4%  | −44 KB / −6.1% |
+| 5  | `perf/jsonpath-optional-feature`          | Make `jsonpath` a cargo feature (kept in `default`) — non-breaking    | 0 (default unchanged) | 0 |
+| 6  | _deferred_                                | Flip `jsonpath` default-off + ship `loro-crdt-jsonpath` companion     | −66 KB / −6.55% | −44 KB / −6.2% |
 
-Stacked, Phases 3-5 deliver roughly **−91 KB gzip / ~9%** off the
+Phases 3-4 are landed size wins. Phase 5 is mechanical groundwork: it
+makes the lean build *possible* (`--no-default-features` drops
+−66 KB gzip) without changing the published artifact. Phase 6 is what
+actually delivers that −66 KB to npm users, and is deferred because it
+is a semver-major break plus a publish-flow change.
+
+Stacked, Phases 3-4 + 6 deliver roughly **−92 KB gzip / ~9%** off the
 default `loro-crdt` bundle, with `loro-crdt-jsonpath` available for
 users who need the heavier feature.
 
@@ -167,43 +174,62 @@ Risk: low. The public TypeScript surface keeps the `setDebug` symbol;
 behavior under the lean build is a clear error rather than silent
 nothing.
 
-### Phase 5 — Move `jsonpath` to an opt-in `loro-crdt-jsonpath` companion package
+### Phase 5 — Make `jsonpath` an opt-in cargo feature (non-breaking)
 
-`crates/loro-wasm/Cargo.toml` hardcodes `jsonpath` in the
-`loro-internal` feature list, which pulls the `pest` parser, its
-generated grammar, and ~190 KB of monomorphized parser-state +
-selector code into every published `loro-crdt` install — whether the
-user calls `LoroDoc.JSONPath` or not.
+`crates/loro-wasm/Cargo.toml` hardcoded `jsonpath` in the
+`loro-internal` feature list, pulling the `pest` parser, its generated
+grammar, and ~190 KB of monomorphized parser-state + selector code
+into every published `loro-crdt` install — whether the user calls
+`LoroDoc.JSONPath` or not.
+
+This phase converts `jsonpath` into a proper cargo feature **without
+changing the published artifact**:
+
+1. `crates/loro-internal/Cargo.toml`: `pest` / `pest_derive` become
+   `optional`; the existing `jsonpath` feature declares them
+   (`jsonpath = ["dep:pest", "dep:pest_derive"]`). The `jsonpath`
+   module was already `#[cfg(feature = "jsonpath")]`.
+2. `crates/loro-wasm/Cargo.toml`: drop the hardcoded `"jsonpath"` from
+   the `loro-internal` dependency; add a `jsonpath` feature that
+   re-enables it — **kept in `default`**.
+3. `crates/loro-wasm/src/lib.rs`: cfg-gate the `JSONPath()` /
+   `subscribeJsonpath()` exports and the manual `subscribeJsonpath`
+   TypeScript behind `#[cfg(feature = "jsonpath")]`.
+
+Because `jsonpath` stays in `default`, the published artifact is
+byte-for-byte unchanged — this phase is non-breaking. What it adds is
+the lean build path: `--no-default-features` drops the JSONPath
+subsystem.
+
+Measured: default build unchanged (raw byte-identical to baseline);
+`--no-default-features` lean build is −188.8 KB raw / −66.5 KB gzip /
+−43.8 KB brotli (−5.89% / −6.55% / −6.19%).
+
+Risk: low. Non-breaking groundwork.
+
+### Phase 6 — Flip the default and ship `loro-crdt-jsonpath` (deferred)
+
+Phase 5 makes the lean build *possible*; Phase 6 makes it the
+*published default* and is where the −66 KB actually reaches npm
+users. Deferred because it is both a semver-major break and a
+publish-flow change.
 
 Approach:
 
-1. Drop `"jsonpath"` from the `loro-internal` features list in
-   `crates/loro-wasm/Cargo.toml:16-20`. Add a `jsonpath` feature to
-   `loro-wasm` itself that re-enables it.
-2. Wrap `json_path` / `subscribe_jsonpath` in
-   `crates/loro-wasm/src/lib.rs:1290-1324` with
-   `#[cfg(feature = "jsonpath")]`.
-3. Gate the `TS_APPEND_CONTENT` doc-comment block for those methods at
-   `crates/loro-wasm/src/lib.rs:6520-6595` behind the same cfg.
-4. In `crates/loro-internal/Cargo.toml:58-59,98` mark `pest` and
-   `pest_derive` `optional = true` and add them to the `jsonpath`
-   feature (`jsonpath = ["dep:pest", "dep:pest_derive"]`). This is a
-   compile-time cleanup; LTO already DCEs them in the wasm without
-   this change.
-5. Extend `crates/loro-wasm/scripts/build.ts` (`cargoBuild` around
-   line 180) to optionally pass `--features jsonpath`, and publish a
-   second npm package `loro-crdt-jsonpath` with the full build. The
-   existing `loro-crdt-map` companion (already published per
-   `build.ts:42`) is the precedent.
-
-Measured against the pinned baseline: −191,858 raw / −66,369 gzip /
-−43,912 brotli (−5.8% / −6.4% / −6.1%). Largest single feature-gated
-win available.
+1. `crates/loro-wasm/Cargo.toml`: drop `jsonpath` from `default`.
+2. Extend `crates/loro-wasm/scripts/build.ts` to additionally build a
+   `--features jsonpath` variant and publish it as a second npm
+   package, `loro-crdt-jsonpath`. The existing `loro-crdt-map`
+   companion (per `build.ts`) is the sibling-package precedent.
+3. Wire the second package into the changeset / `release_wasm.yml`
+   publish flow.
+4. Add a changeset note + a README migration paragraph: `loro-crdt`
+   consumers calling `LoroDoc.JSONPath()` / `subscribeJsonpath()`
+   switch to `loro-crdt-jsonpath`.
 
 Risk: medium — public JS API of the default package loses
-`LoroDoc.JSONPath()` and `LoroDoc.subscribeJsonpath()`. Users who
-need them install the companion. Needs a changeset note and a
-migration paragraph in the README.
+`LoroDoc.JSONPath()` and `LoroDoc.subscribeJsonpath()`; the build and
+publish pipeline roughly doubles. Needs its own focused PR.
 
 ## Stacking and ordering
 
@@ -214,11 +240,11 @@ paths (compile-time macro elision vs. subscriber-side DCE) — but a
 combined-measurement check in the implementing PR is a sanity step
 worth doing.
 
-Phase 5 is independent of Phases 3-4 (different crates entirely) and
-delivers the largest single win, so a reviewer-friendly order is:
+Phase 5 is independent of Phases 3-4 (different crates entirely), so a
+reviewer-friendly order is:
 
 ```
-2 (panic hook) → 3 (release_max_level_off) → 4 (tracing-wasm gate) → 5 (jsonpath split)
+2 (panic hook) → 3 (release_max_level_off) → 4 (tracing-wasm gate) → 5 (jsonpath feature) → 6 (jsonpath split)
 ```
 
 ## Follow-ups (deferred, not in this plan)
@@ -226,7 +252,7 @@ delivers the largest single win, so a reviewer-friendly order is:
 - **`Arc<FxHashMap>` vs `im::HashMap`** for `ImVersionVector` — twiggy
   shows `im` only costs ~4.8 KB code so the marginal raw win is small,
   but it would unlock dropping `sized-chunks` (~2 KB) and `bitmaps`.
-  Worth revisiting once Phase 5 lands and the bigger items are off
+  Worth revisiting once Phase 6 lands and the bigger items are off
   the board.
 - **Unifying duplicated `itertools` 0.11 + 0.12** — needs an upstream
   bump of `generic-btree` and `serde_columnar` (both `loro-dev`
@@ -257,3 +283,10 @@ absolute sizes.
   measurement reports for jsonpath, tracing-wasm gating, and the
   `release_max_level_off` finding are summarized in the
   corresponding phase sections.
+- 2026-05-18: Original Phase 5 (jsonpath companion package) split into
+  Phase 5 (non-breaking cargo-feature groundwork) and a deferred
+  Phase 6 (flip default + ship `loro-crdt-jsonpath`). Rationale:
+  removing `LoroDoc.JSONPath()` from the default `loro-crdt` package
+  is a semver-major break and the dual-package publish flow is a
+  large, hard-to-test build-script change — both deserve their own
+  focused PR rather than riding along with the mechanical gating.
