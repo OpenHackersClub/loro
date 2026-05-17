@@ -3,7 +3,6 @@ import {
     EphemeralStore,
     EphemeralStoreWasm,
     EphemeralListener,
-    setDebug,
     EphemeralStoreEvent,
 } from "../bundler/index";
 
@@ -32,7 +31,6 @@ describe("EphemeralStore", () => {
     });
 
     it("should remove outdated", async () => {
-        setDebug();
         let outdated: string[] = [];
         const store = new EphemeralStoreWasm(5);
         store.subscribe((e) => {

@@ -4,7 +4,6 @@ import {
   AwarenessWasm,
   Cursor,
   PeerID,
-  setDebug,
 } from "../bundler/index";
 import { AwarenessListener } from "../bundler/index";
 
@@ -45,7 +44,6 @@ describe("Awareness", () => {
   });
 
   it("should remove outdated", async () => {
-    setDebug();
     const awareness = new AwarenessWasm("123", 5);
     awareness.setLocalState({ foo: "bar" });
     await new Promise((r) => setTimeout(r, 10));
