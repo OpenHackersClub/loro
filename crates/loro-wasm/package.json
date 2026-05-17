@@ -27,14 +27,17 @@
     "./nodejs",
     "./web",
     "./base64",
+    "./jsonpath",
     "CHANGELOG.md",
     "README.md",
     "LICENSE",
     "package.json"
   ],
   "scripts": {
-    "build-dev": "deno run -A ./scripts/build.ts dev && rollup -c && deno run -A ./scripts/post-rollup.ts && npm run test",
-    "build-release": "deno run -A ./scripts/build.ts release && rollup -c && deno run -A ./scripts/post-rollup.ts && npm run test",
+    "build-wasm-dev": "deno run -A ./scripts/build.ts dev && rollup -c && deno run -A ./scripts/post-rollup.ts",
+    "build-wasm-release": "deno run -A ./scripts/build.ts release && rollup -c && deno run -A ./scripts/post-rollup.ts",
+    "build-dev": "npm run build-wasm-dev && LORO_WASM_JSONPATH=1 npm run build-wasm-dev && npm run test",
+    "build-release": "npm run build-wasm-release && LORO_WASM_JSONPATH=1 npm run build-wasm-release && npm run test",
     "test": "node --expose-gc ./node_modules/vitest/vitest.mjs run && npx tsc --noEmit && cd ./deno_tests && deno test -A && cd ../bun_tests && bun test"
   },
   "homepage": "https://loro.dev",

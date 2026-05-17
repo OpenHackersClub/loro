@@ -35,11 +35,12 @@ tracing = { version = "0.1", features = ["release_max_level_off"] }
 parking_lot = "0.12.5"
 
 [features]
-# `jsonpath` is on by default so the published `loro-crdt` build is
-# unchanged. Building with `--no-default-features` drops the `pest`
-# parser + JSONPath grammar (~65 KB gzip). A future `loro-crdt-jsonpath`
-# companion package will ship the full build for users who need it.
-default = ["jsonpath"]
+# `jsonpath` is OFF by default: the published `loro-crdt` entry point is
+# the lean build (no `pest` parser / JSONPath grammar, ~66 KB gzip
+# smaller). The `loro-crdt/jsonpath` subpath ships a separate artifact
+# built with this feature on — see scripts/build.ts and the `jsonpath/`
+# package directory.
+default = []
 jsonpath = ["loro-internal/jsonpath"]
 # Compiles `setDebug()` and links `tracing-wasm` (plus its
 # `tracing-subscriber` / `sharded-slab` graph). Off by default so the

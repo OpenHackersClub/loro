@@ -1,0 +1,10 @@
+{
+  "description": "JSONPath-enabled loro-crdt build. Not published on its own — it ships inside the `loro-crdt` package and is reached via the `loro-crdt/jsonpath` subpath. This package.json only exists so Node and bundlers resolve the subpath to the right per-environment artifact.",
+  "main": "nodejs/index.js",
+  "browser": {
+    "./bundler/loro_wasm": "./browser/loro_wasm.js",
+    "./bundler/loro_wasm.js": "./browser/loro_wasm.js"
+  },
+  "module": "bundler/index.js",
+  "types": "bundler/index.d.ts"
+}

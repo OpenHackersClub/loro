@@ -88,6 +88,27 @@ Vite and Webpack understand `new URL("./loro_wasm_bg.wasm", import.meta.url)` an
 
 Next.js Turbopack can use the default browser entry. If a Next.js Webpack build resolves the `bundler` entry instead of the package `browser` remap, use `loro-crdt/base64`.
 
+## JSONPath
+
+The default `loro-crdt` import is a lean build that does **not** include the
+JSONPath engine. `LoroDoc.JSONPath()` and `LoroDoc.subscribeJsonpath()` are
+available from the `loro-crdt/jsonpath` subpath, which ships a separate build
+with the `pest`-based JSONPath grammar compiled in:
+
+```ts
+// No JSONPath — smallest bundle:
+import { LoroDoc } from "loro-crdt";
+
+// With JSONPath — adds ~66 KB gzip:
+import { LoroDoc } from "loro-crdt/jsonpath";
+const doc = new LoroDoc();
+doc.JSONPath("$.store.books[?(@.price > 10)].title");
+```
+
+The subpath mirrors the main package's target entries (`bundler`, `browser`,
+`nodejs`, `web`); pick one explicitly if your tooling needs it, e.g.
+`loro-crdt/jsonpath/nodejs`.
+
 # Example
 
 [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/loro-basic-test?file=test%2Floro-sync.test.ts)
