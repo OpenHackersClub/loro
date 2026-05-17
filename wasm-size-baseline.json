@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-05-17T14:31:37.342Z",
+  "commit": "d4fdfdaf",
+  "targets": {
+    "bundler": {
+      "raw": 3284697,
+      "gzip": 1039548,
+      "brotli": 723269
+    },
+    "browser": {
+      "raw": 3284697,
+      "gzip": 1039548,
+      "brotli": 723269
+    },
+    "nodejs": {
+      "raw": 3285481,
+      "gzip": 1039580,
+      "brotli": 722901
+    },
+    "web": {
+      "raw": 3283129,
+      "gzip": 1039469,
+      "brotli": 723237
+    }
+  }
+}
